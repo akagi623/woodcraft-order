@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>天板・建築資材オーダーシミュレーター</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & Noto Sans JP -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans JP', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              900: '#0c4a6e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .grid-pattern {
+      background-size: 20px 20px;
+      background-image: 
+        linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    /* スマホでドラッグ時に画面スクロールを抑止 */
+    #boardCanvas {
+      touch-action: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      height: 22px;
+      width: 22px;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased pb-24 lg:pb-0">
+
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 sm:w-9 sm:h-9 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md shadow-brand-500/20">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-none">WOODCRAFT ORDER</h1>
+          <p class="text-[10px] sm:text-xs text-slate-500 font-medium mt-0.5 sm:mt-1">建築資材・テーブル天板 形状シミュレーター</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <span class="inline-flex items-center px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+          連動中
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
+    
+    <!-- 左側: インタラクティブキャンバス描画エリア -->
+    <div class="lg:col-span-8 flex flex-col gap-4">
+      
+      <!-- シミュレータープレビューカード -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <!-- キャンバストップ操作ツールバー -->
+        <div class="px-3 sm:px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2 text-xs text-slate-600 font-medium">
+          <div class="flex items-center space-x-1.5 sm:space-x-2">
+            <span class="flex items-center text-slate-700 font-semibold text-[11px] sm:text-xs">
+              <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 text-brand-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+              </svg>
+              丸印ドラッグ（青: 寸法変更 / 橙: 角丸R変更）
+            </span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button id="btnResetView" class="px-2.5 py-1 text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 rounded-md transition-colors text-[11px] sm:text-xs font-semibold shadow-sm">
+              標準寸法に戻す
+            </button>
+          </div>
+        </div>
+
+        <div class="relative w-full h-[360px] sm:h-[440px] lg:h-[480px] bg-slate-50/70 grid-pattern flex items-center justify-center overflow-hidden select-none" id="canvasWrapper">
+          <canvas id="boardCanvas" class="w-full h-full cursor-default block"></canvas>
+
+          <!-- 4辺の △ 補強テープ切り替えボタン群 -->
+          <!-- 上辺 △ボタン -->
+          <button id="edgeToggleTop" class="absolute px-2.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-md flex items-center space-x-1 border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-700 active:scale-95 z-20">
+            <span class="text-[10px]">▲</span>
+            <span class="text-[11px]">上辺シール</span>
+          </button>
+          <!-- 下辺 △ボタン -->
+          <button id="edgeToggleBottom" class="absolute px-2.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-md flex items-center space-x-1 border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-700 active:scale-95 z-20">
+            <span class="text-[10px]">▼</span>
+            <span class="text-[11px]">下辺シール</span>
+          </button>
+          <!-- 左辺 △ボタン -->
+          <button id="edgeToggleLeft" class="absolute px-2 py-1.5 rounded-full text-xs font-bold transition-all shadow-md flex items-center space-x-1 border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-700 active:scale-95 z-20">
+            <span class="text-[10px]">◀</span>
+            <span class="text-[11px]">左辺シール</span>
+          </button>
+          <!-- 右辺 △ボタン -->
+          <button id="edgeToggleRight" class="absolute px-2 py-1.5 rounded-full text-xs font-bold transition-all shadow-md flex items-center space-x-1 border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-700 active:scale-95 z-20">
+            <span class="text-[10px]">▶</span>
+            <span class="text-[11px]">右辺シール</span>
+          </button>
+
+          <!-- 寸法チップ表示（フローティング） -->
+          <div class="absolute top-2.5 left-2.5 bg-white/95 backdrop-blur-sm border border-slate-200 px-3 py-1.5 rounded-xl shadow-sm pointer-events-none flex items-center space-x-3 text-xs z-10">
+            <div>
+              <span class="text-slate-400 block text-[9px] font-semibold uppercase leading-tight">寸法 (W × D)</span>
+              <span id="overlayDimText" class="font-bold text-slate-800 text-xs sm:text-sm font-mono">1400 × 750 mm</span>
+            </div>
+            <div class="h-5 w-px bg-slate-200"></div>
+            <div>
+              <span class="text-slate-400 block text-[9px] font-semibold uppercase leading-tight">角丸加工</span>
+              <span id="overlayRText" class="font-bold text-indigo-600 text-xs sm:text-sm font-mono">30 R</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 sm:p-4 bg-white border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center space-x-2 sm:space-x-3 overflow-x-auto custom-scroll w-full sm:w-auto pb-1 sm:pb-0">
+            <span class="text-xs font-semibold text-slate-700 whitespace-nowrap">樹種:</span>
+            <div class="flex items-center space-x-2" id="materialSelector">
+              <button data-material="oak" class="mat-btn active px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border border-amber-400 bg-amber-50 text-amber-900 flex items-center space-x-1.5 shadow-sm whitespace-nowrap active:scale-95 transition-transform">
+                <span class="w-3.5 h-3.5 rounded-full bg-[#d8b078] border border-amber-600 inline-block"></span>
+                <span>オーク</span>
+              </button>
+              <button data-material="walnut" class="mat-btn px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 hover:border-slate-300 text-slate-700 flex items-center space-x-1.5 whitespace-nowrap active:scale-95 transition-transform">
+                <span class="w-3.5 h-3.5 rounded-full bg-[#5d3f29] inline-block"></span>
+                <span>ウォールナット</span>
+              </button>
+              <button data-material="ash" class="mat-btn px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 hover:border-slate-300 text-slate-700 flex items-center space-x-1.5 whitespace-nowrap active:scale-95 transition-transform">
+                <span class="w-3.5 h-3.5 rounded-full bg-[#dfd9c7] inline-block"></span>
+                <span>タモ</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between w-full sm:w-auto space-x-2 text-xs pt-1 sm:pt-0">
+            <span class="text-slate-500">補強シール一括:</span>
+            <div class="flex space-x-1.5">
+              <button id="btnAllEdgeOn" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 rounded font-medium">全ON</button>
+              <button id="btnAllEdgeOff" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 rounded font-medium">全OFF</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-4">
+        <h2 class="text-sm font-bold text-slate-900 flex items-center">
+          <svg class="w-4 h-4 mr-1.5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+          </svg>
+          寸法・角Rの数値指定
+        </h2>
+
+        <!-- 横幅 (Width) -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="inputWidth" class="text-xs font-semibold text-slate-700">横幅 (W)</label>
+            <div class="flex items-center space-x-1">
+              <button type="button" class="quick-step-btn px-2 py-0.5 text-xs bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded font-bold text-slate-600" data-target="width" data-step="-50">-50</button>
+              <button type="button" class="quick-step-btn px-2 py-0.5 text-xs bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded font-bold text-slate-600" data-target="width" data-step="50">+50</button>
+              <input type="number" id="inputWidth" min="400" max="2400" step="10" value="1400" class="w-16 px-1.5 py-1 text-right text-xs font-mono font-bold bg-slate-50 border border-slate-300 rounded focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <span class="text-xs text-slate-500 ml-1">mm</span>
+            </div>
+          </div>
+          <input type="range" id="rangeWidth" min="400" max="2400" step="10" value="1400" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-600">
+          <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+            <span>400mm</span>
+            <span>1400mm</span>
+            <span>2400mm</span>
+          </div>
+        </div>
+
+        <!-- 奥行き (Depth) -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="inputDepth" class="text-xs font-semibold text-slate-700">奥行き (D)</label>
+            <div class="flex items-center space-x-1">
+              <button type="button" class="quick-step-btn px-2 py-0.5 text-xs bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded font-bold text-slate-600" data-target="depth" data-step="-50">-50</button>
+              <button type="button" class="quick-step-btn px-2 py-0.5 text-xs bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded font-bold text-slate-600" data-target="depth" data-step="50">+50</button>
+              <input type="number" id="inputDepth" min="300" max="1200" step="10" value="750" class="w-16 px-1.5 py-1 text-right text-xs font-mono font-bold bg-slate-50 border border-slate-300 rounded focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <span class="text-xs text-slate-500 ml-1">mm</span>
+            </div>
+          </div>
+          <input type="range" id="rangeDepth" min="300" max="1200" step="10" value="750" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-600">
+          <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+            <span>300mm</span>
+            <span>750mm</span>
+            <span>1200mm</span>
+          </div>
+        </div>
+
+        <!-- 角の丸み (R半径) -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="inputRadius" class="text-xs font-semibold text-slate-700">4隅の角丸加工 (R値)</label>
+            <div class="flex items-center space-x-1">
+              <button type="button" class="quick-step-btn px-2 py-0.5 text-xs bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded font-bold text-slate-600" data-target="radius" data-step="-10">-10</button>
+              <button type="button" class="quick-step-btn px-2 py-0.5 text-xs bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded font-bold text-slate-600" data-target="radius" data-step="10">+10</button>
+              <input type="number" id="inputRadius" min="0" max="120" step="5" value="30" class="w-16 px-1.5 py-1 text-right text-xs font-mono font-bold bg-slate-50 border border-slate-300 rounded focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <span class="text-xs text-slate-500 ml-1">mm</span>
+            </div>
+          </div>
+          <input type="range" id="rangeRadius" min="0" max="120" step="5" value="30" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+          <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+            <span>直角 (0R)</span>
+            <span>標準 (30R)</span>
+            <span>大丸 (120R)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lg:col-span-4 flex flex-col gap-4">
+      <div id="orderCard" class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
+        <h2 class="text-base font-bold text-slate-900 pb-3 border-b border-slate-100 flex items-center justify-between">
+          <span>ご注文・お見積もり情報</span>
+          <span class="text-[11px] font-normal text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">板厚 25mm</span>
+        </h2>
+
+        <!-- 仕様確認リスト -->
+        <div class="py-3 space-y-2 border-b border-slate-100 text-xs">
+          <div class="flex justify-between">
+            <span class="text-slate-500">選択樹種:</span>
+            <span id="summaryMaterial" class="font-semibold text-slate-800">ホワイトオーク</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">寸法 (W × D × T):</span>
+            <span id="summaryDimension" class="font-semibold text-slate-800 font-mono">1400 × 750 × 25 mm</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">四隅角加工:</span>
+            <span id="summaryRadius" class="font-semibold text-indigo-600 font-mono">30 R (4隅)</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">木口補強テープ:</span>
+            <span id="summaryEdgeTape" class="font-semibold text-slate-800">4辺すべて施工</span>
+          </div>
+        </div>
+
+        <!-- お客様情報入力 -->
+        <div class="py-3 space-y-3">
+          <div>
+            <label for="orderCustomerName" class="block text-xs font-medium text-slate-600 mb-1">お名前 / 貴社名 <span class="text-red-500">*</span></label>
+            <input type="text" id="orderCustomerName" placeholder="例: 山田 太郎" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+          </div>
+          <div>
+            <label for="orderCustomerPhone" class="block text-xs font-medium text-slate-600 mb-1">ご連絡先お電話番号</label>
+            <input type="tel" id="orderCustomerPhone" placeholder="例: 090-1234-5678" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+          </div>
+          <div>
+            <label for="orderNotes" class="block text-xs font-medium text-slate-600 mb-1">ご要望・面取り・塗装指定など（任意）</label>
+            <textarea id="orderNotes" rows="2" placeholder="例: 表面クリア塗装希望、角Rは少し緩めでも可など" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none resize-none"></textarea>
+          </div>
+        </div>
+
+        <!-- 概算価格サマリー -->
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 mb-4">
+          <div class="flex justify-between items-baseline mb-1">
+            <span class="text-xs text-slate-500 font-medium">概算参考価格 (税別)</span>
+            <span id="estimatedPrice" class="text-xl font-bold font-mono text-slate-900">¥28,400</span>
+          </div>
+          <p class="text-[11px] text-slate-400">※寸法面積・R加工費・補強テープ施工費を含む目安金額です</p>
+        </div>
+
+        <!-- アクションボタン群 -->
+        <div class="space-y-2.5">
+          <button id="btnSendOrder" class="w-full py-3.5 px-4 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold rounded-xl shadow-lg shadow-brand-600/30 flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <span class="text-sm">この仕様で発注する (メーラー起動)</span>
+          </button>
+
+          <button id="btnCopyOrderText" class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs flex items-center justify-center space-x-2 transition-colors">
+            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+            </svg>
+            <span>メール本文をコピー（手動送信用）</span>
+          </button>
+        </div>
+
+        <p class="text-[11px] text-slate-400 mt-3 text-center leading-relaxed">
+          宛先: <strong class="text-slate-600">nijiua@gmail.com</strong><br>
+          ボタンを押すと仕様が入力されたメール作成画面が開きます。
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-2.5 z-40 flex items-center justify-between shadow-lg">
+    <div>
+      <span class="text-[10px] text-slate-400 block font-semibold leading-none">概算参考価格(税別)</span>
+      <span id="mobileBottomPrice" class="text-base font-bold font-mono text-slate-900 leading-tight">¥28,400</span>
+    </div>
+    <div class="flex items-center space-x-2">
+      <button id="btnMobileScrollToOrder" class="px-4 py-2 bg-brand-600 active:bg-brand-700 text-white font-bold rounded-xl text-xs flex items-center space-x-1.5 shadow-md shadow-brand-500/30">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+        <span>発注・見積送信</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="toastNotification" class="fixed bottom-16 lg:bottom-6 right-4 sm:right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none max-w-sm">
+    <div class="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3 text-xs sm:text-sm">
+      <div id="toastIcon" class="text-emerald-400">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+      <span id="toastMessage" class="font-medium">メッセージ</span>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      width: 1400,     // mm (横幅: 400 - 2400)
+      depth: 750,      // mm (奥行き: 300 - 1200)
+      radius: 30,      // mm (角R: 0 - 120)
+      thickness: 25,   // mm (板厚)
+      material: 'oak', // oak, walnut, ash
+      edges: {
+        top: true,
+        bottom: true,
+        left: true,
+        right: true
+      },
+      isDragging: false,
+      dragHandle: null,
+      dragStartPos: { x: 0, y: 0 },
+      dragStartValue: { width: 0, depth: 0, radius: 0 }
+    };
+
+    const materials = {
+      oak: {
+        name: 'ホワイトオーク突板 / 集成材',
+        color: '#e2be89',
+        darkColor: '#bb8f54',
+        sealActiveColor: '#1e1b4b',
+        sealInactiveColor: '#ebd9ba'
+      },
+      walnut: {
+        name: 'ウォールナット突板',
+        color: '#704f37',
+        darkColor: '#452b1b',
+        sealActiveColor: '#18120e',
+        sealInactiveColor: '#967357'
+      },
+      ash: {
+        name: 'タモ / アッシュ突板',
+        color: '#e4dece',
+        darkColor: '#b5ab95',
+        sealActiveColor: '#2b2c34',
+        sealInactiveColor: '#ece7db'
+      }
+    };
+
+    // 描画幾何計算キャッシュ
+    const geom = {
+      scale: 0.25,
+      boardX: 0,
+      boardY: 0,
+      boardW: 0,
+      boardH: 0,
+      handles: {}
+    };
+
+    // DOM要素参照
+    const canvas = document.getElementById('boardCanvas');
+    const ctx = canvas.getContext('2d');
+    const canvasWrapper = document.getElementById('canvasWrapper');
+
+    const inputWidth = document.getElementById('inputWidth');
+    const rangeWidth = document.getElementById('rangeWidth');
+    const inputDepth = document.getElementById('inputDepth');
+    const rangeDepth = document.getElementById('rangeDepth');
+    const inputRadius = document.getElementById('inputRadius');
+    const rangeRadius = document.getElementById('rangeRadius');
+
+    const overlayDimText = document.getElementById('overlayDimText');
+    const overlayRText = document.getElementById('overlayRText');
+    const estimatedPrice = document.getElementById('estimatedPrice');
+    const mobileBottomPrice = document.getElementById('mobileBottomPrice');
+    const btnMobileScrollToOrder = document.getElementById('btnMobileScrollToOrder');
+
+    const edgeToggleTop = document.getElementById('edgeToggleTop');
+    const edgeToggleBottom = document.getElementById('edgeToggleBottom');
+    const edgeToggleLeft = document.getElementById('edgeToggleLeft');
+    const edgeToggleRight = document.getElementById('edgeToggleRight');
+    const btnAllEdgeOn = document.getElementById('btnAllEdgeOn');
+    const btnAllEdgeOff = document.getElementById('btnAllEdgeOff');
+    const btnResetView = document.getElementById('btnResetView');
+
+    const summaryMaterial = document.getElementById('summaryMaterial');
+    const summaryDimension = document.getElementById('summaryDimension');
+    const summaryRadius = document.getElementById('summaryRadius');
+    const summaryEdgeTape = document.getElementById('summaryEdgeTape');
+
+    const btnSendOrder = document.getElementById('btnSendOrder');
+    const btnCopyOrderText = document.getElementById('btnCopyOrderText');
+    const orderCustomerName = document.getElementById('orderCustomerName');
+    const orderCustomerPhone = document.getElementById('orderCustomerPhone');
+    const orderNotes = document.getElementById('orderNotes');
+
+    function calculatePrice() {
+      const areaM2 = (state.width * state.depth) / 1000000;
+      let baseRate = 18000;
+      if (state.material === 'walnut') baseRate = 26000;
+      if (state.material === 'ash') baseRate = 20000;
+
+      let price = areaM2 * baseRate + 6000;
+      if (state.radius > 0) {
+        price += 2500;
+      }
+      const activeEdgesCount = Object.values(state.edges).filter(Boolean).length;
+      price += activeEdgesCount * 1200;
+
+      const rounded = Math.round(price / 100) * 100;
+      const formatted = '¥' + rounded.toLocaleString('ja-JP');
+      estimatedPrice.textContent = formatted;
+      if (mobileBottomPrice) {
+        mobileBottomPrice.textContent = formatted;
+      }
+      return rounded;
+    }
+
+    function syncUI() {
+      inputWidth.value = state.width;
+      rangeWidth.value = state.width;
+      inputDepth.value = state.depth;
+      rangeDepth.value = state.depth;
+      inputRadius.value = state.radius;
+      rangeRadius.value = state.radius;
+
+      overlayDimText.textContent = `${state.width} × ${state.depth} mm`;
+      overlayRText.textContent = `${state.radius} R`;
+
+      summaryMaterial.textContent = materials[state.material].name.split(' ')[0];
+      summaryDimension.textContent = `${state.width} × ${state.depth} × ${state.thickness} mm`;
+      summaryRadius.textContent = state.radius > 0 ? `${state.radius} R (4隅丸め)` : '直角 (0R)';
+
+      const activeEdges = [];
+      if (state.edges.top) activeEdges.push('上');
+      if (state.edges.bottom) activeEdges.push('下');
+      if (state.edges.left) activeEdges.push('左');
+      if (state.edges.right) activeEdges.push('右');
+
+      if (activeEdges.length === 4) {
+        summaryEdgeTape.textContent = '4辺すべて施工 (全周)';
+      } else if (activeEdges.length === 0) {
+        summaryEdgeTape.textContent = '施工なし (木口未処理)';
+      } else {
+        summaryEdgeTape.textContent = `${activeEdges.join('・')} 辺のみ施工`;
+      }
+
+      updateEdgeButtonStyles();
+      calculatePrice();
+      positionTriangleButtons();
+    }
+
+    function updateEdgeButtonStyles() {
+      const updateBtn = (btn, isActive, labelText) => {
+        if (isActive) {
+          btn.className = 'absolute px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-bold transition-all shadow-md flex items-center space-x-1 border border-indigo-700 bg-indigo-900 text-white active:scale-95 z-20';
+          btn.innerHTML = `<span class="text-[10px] text-amber-300">●</span><span class="text-[11px]">${labelText}: ON</span>`;
+        } else {
+          btn.className = 'absolute px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-bold transition-all shadow-sm flex items-center space-x-1 border border-slate-300 bg-white/90 text-slate-500 hover:bg-slate-50 active:scale-95 z-20';
+          btn.innerHTML = `<span class="text-[10px] text-slate-400">○</span><span class="text-[11px]">${labelText}: OFF</span>`;
+        }
+      };
+
+      updateBtn(edgeToggleTop, state.edges.top, '上');
+      updateBtn(edgeToggleBottom, state.edges.bottom, '下');
+      updateBtn(edgeToggleLeft, state.edges.left, '左');
+      updateBtn(edgeToggleRight, state.edges.right, '右');
+    }
+
+    function positionTriangleButtons() {
+      if (!geom.boardW || !canvasWrapper) return;
+      const rect = canvasWrapper.getBoundingClientRect();
+      if (rect.width === 0) return;
+
+      const topBtnW = edgeToggleTop.offsetWidth || 75;
+      const topX = Math.max(8, Math.min(rect.width - topBtnW - 8, geom.boardX + geom.boardW / 2 - topBtnW / 2));
+      edgeToggleTop.style.left = `${topX}px`;
+      edgeToggleTop.style.top = `${Math.max(8, geom.boardY - 36)}px`;
+
+      const botBtnW = edgeToggleBottom.offsetWidth || 75;
+      const botX = Math.max(8, Math.min(rect.width - botBtnW - 8, geom.boardX + geom.boardW / 2 - botBtnW / 2));
+      edgeToggleBottom.style.left = `${botX}px`;
+      edgeToggleBottom.style.top = `${Math.min(rect.height - 34, geom.boardY + geom.boardH + 12)}px`;
+
+      const leftBtnW = edgeToggleLeft.offsetWidth || 75;
+      edgeToggleLeft.style.left = `${Math.max(6, geom.boardX - leftBtnW - 8)}px`;
+      edgeToggleLeft.style.top = `${Math.max(40, Math.min(rect.height - 36, geom.boardY + geom.boardH / 2 - 14))}px`;
+
+      const rightBtnW = edgeToggleRight.offsetWidth || 75;
+      edgeToggleRight.style.left = `${Math.min(rect.width - rightBtnW - 6, geom.boardX + geom.boardW + 8)}px`;
+      edgeToggleRight.style.top = `${Math.max(40, Math.min(rect.height - 36, geom.boardY + geom.boardH / 2 - 14))}px`;
+    }
+
+    function drawRoundedRectPath(c, x, y, width, height, radius) {
+      c.beginPath();
+      c.moveTo(x + radius, y);
+      c.lineTo(x + width - radius, y);
+      c.quadraticCurveTo(x + width, y, x + width, y + radius);
+      c.lineTo(x + width, y + height - radius);
+      c.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      c.lineTo(x + radius, y + height);
+      c.quadraticCurveTo(x, y + height, x, y + height - radius);
+      c.lineTo(x, y + radius);
+      c.quadraticCurveTo(x, y, x + radius, y);
+      c.closePath();
+    }
+
+    function drawWoodGrain(c, x, y, w, h) {
+      c.save();
+      c.strokeStyle = 'rgba(0, 0, 0, 0.04)';
+      c.lineWidth = 1;
+      const grainCount = Math.floor(h / 12);
+      for (let i = 1; i <= grainCount; i++) {
+        const lineY = y + i * 12 + (Math.sin(i * 1.5) * 3);
+        c.beginPath();
+        c.moveTo(x, lineY);
+        c.bezierCurveTo(x + w * 0.3, lineY - 2, x + w * 0.7, lineY + 3, x + w, lineY - 1);
+        c.stroke();
+      }
+      c.restore();
+    }
+
+    function draw() {
+      if (!canvas || !ctx || !canvasWrapper) return;
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (w === 0 || h === 0) return;
+
+      const dpr = window.devicePixelRatio || 1;
+      if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+      }
+
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, w, h);
+
+      // スケール計算: 最大対応サイズ (2400 × 1200mm) が綺麗に収まる固定基準スケールを採用
+      // これにより、数値を増やすと図面も2400mmまで確実に大きくなり、途中で止まることがなくなります
+      const isMobile = w < 640;
+      const padX = isMobile ? 55 : 80;
+      const padY = isMobile ? 48 : 65;
+
+      const maxConfigW = 2400;
+      const maxConfigD = 1200;
+      const scaleX = (w - padX * 2) / maxConfigW;
+      const scaleY = (h - padY * 2) / maxConfigD;
+      const scale = Math.min(scaleX, scaleY);
+      geom.scale = scale;
+
+      const boardW = Math.round(state.width * scale);
+      const boardH = Math.round(state.depth * scale);
+      const boardX = Math.round((w - boardW) / 2);
+      const boardY = Math.round((h - boardH) / 2);
+
+      geom.boardX = boardX;
+      geom.boardY = boardY;
+      geom.boardW = boardW;
+      geom.boardH = boardH;
+
+      const safeR = Math.min(state.radius * scale, boardW / 2, boardH / 2);
+      const mat = materials[state.material];
+
+      // 1. ドロップシャドウ
+      ctx.save();
+      ctx.shadowColor = 'rgba(15, 23, 42, 0.12)';
+      ctx.shadowBlur = 18;
+      ctx.shadowOffsetY = 10;
+      drawRoundedRectPath(ctx, boardX, boardY, boardW, boardH, safeR);
+      ctx.fillStyle = mat.color;
+      ctx.fill();
+      ctx.restore();
+
+      // 2. 天板の木目・グラデーション描画
+      ctx.save();
+      drawRoundedRectPath(ctx, boardX, boardY, boardW, boardH, safeR);
+      ctx.clip();
+
+      const grad = ctx.createLinearGradient(boardX, boardY, boardX, boardY + boardH);
+      grad.addColorStop(0, mat.color);
+      grad.addColorStop(1, mat.darkColor);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      drawWoodGrain(ctx, boardX, boardY, boardW, boardH);
+      ctx.restore();
+
+      // 3. 外周エッジベース描画
+      ctx.save();
+      drawRoundedRectPath(ctx, boardX, boardY, boardW, boardH, safeR);
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+
+      // 4. 各辺の補強テープ（木口シール）の描画
+      drawEdgeReinforcements(boardX, boardY, boardW, boardH, safeR, mat);
+
+      // 5. 寸法線・矢印・テキスト描画
+      drawDimensions(boardX, boardY, boardW, boardH);
+
+      // 6. 操作ハンドルの描画
+      drawHandles(boardX, boardY, boardW, boardH, safeR);
+
+      ctx.restore();
+      positionTriangleButtons();
+    }
+
+    function drawEdgeReinforcements(bx, by, bw, bh, safeR, mat) {
+      const activeColor = mat.sealActiveColor;
+      const tapeWidth = 6;
+
+      const drawEdgeLine = (x1, y1, x2, y2, isActive) => {
+        ctx.save();
+        if (isActive) {
+          ctx.strokeStyle = activeColor;
+          ctx.lineWidth = tapeWidth;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+
+          // 補強シールの質感を強調するハイライトライン
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        } else {
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      };
+
+      // 上辺
+      drawEdgeLine(bx + safeR, by, bx + bw - safeR, by, state.edges.top);
+      // 下辺
+      drawEdgeLine(bx + safeR, by + bh, bx + bw - safeR, by + bh, state.edges.bottom);
+      // 左辺
+      drawEdgeLine(bx, by + safeR, bx, by + bh - safeR, state.edges.left);
+      // 右辺
+      drawEdgeLine(bx + bw, by + safeR, bx + bw, by + bh - safeR, state.edges.right);
+    }
+
+    function drawDimensions(bx, by, bw, bh) {
+      ctx.save();
+      ctx.strokeStyle = '#64748b';
+      ctx.fillStyle = '#334155';
+      ctx.font = '600 11px Inter, Noto Sans JP, sans-serif';
+      ctx.lineWidth = 1;
+
+      // 1. 横幅 (W) 寸法線（天板の上）
+      const dimY = by - 16;
+      ctx.beginPath();
+      ctx.moveTo(bx, dimY);
+      ctx.lineTo(bx + bw, dimY);
+      ctx.moveTo(bx, dimY - 4);
+      ctx.lineTo(bx, dimY + 4);
+      ctx.moveTo(bx + bw, dimY - 4);
+      ctx.lineTo(bx + bw, dimY + 4);
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(`W ${state.width} mm`, bx + bw / 2, dimY - 2);
+
+      // 2. 奥行き (D) 寸法線（天板の左）
+      const dimX = bx - 16;
+      ctx.beginPath();
+      ctx.moveTo(dimX, by);
+      ctx.lineTo(dimX, by + bh);
+      ctx.moveTo(dimX - 4, by);
+      ctx.lineTo(dimX + 4, by);
+      ctx.moveTo(dimX - 4, by + bh);
+      ctx.lineTo(dimX + 4, by + bh);
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(dimX - 4, by + bh / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(`D ${state.depth} mm`, 0, 0);
+      ctx.restore();
+
+      ctx.restore();
+    }
+
+    function drawHandles(bx, by, bw, bh, safeR) {
+      const isMobile = window.innerWidth < 640;
+      const baseR = isMobile ? 12 : 9;
+
+      // 角Rハンドルの位置: 右上角の頂点から斜め45度内側に配置
+      // R=0のときでもタップできるよう、最小オフセット(18px)を確保
+      const cornerOffset = Math.max(18, safeR * 0.75);
+      const rHandleX = bx + bw - cornerOffset;
+      const rHandleY = by + cornerOffset;
+
+      geom.handles = {
+        width: { x: bx + bw, y: by + bh / 2, r: baseR, cursor: 'ew-resize' },
+        depth: { x: bx + bw / 2, y: by + bh, r: baseR, cursor: 'ns-resize' },
+        corner: { x: bx + bw, y: by + bh, r: baseR + 2, cursor: 'nwse-resize' },
+        radius: { x: rHandleX, y: rHandleY, r: baseR + 2, cursor: 'crosshair' }
+      };
+
+      const renderBlueHandle = (h, key) => {
+        const isCurrent = (state.isDragging && state.dragHandle === key);
+        ctx.save();
+        ctx.shadowColor = 'rgba(2, 132, 199, 0.5)';
+        ctx.shadowBlur = isCurrent ? 12 : 6;
+        ctx.fillStyle = isCurrent ? '#0369a1' : '#0284c7';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.5;
+
+        const drawR = isCurrent ? h.r + 3 : h.r;
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, drawR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // スマホ用タップガイド外輪
+        ctx.strokeStyle = 'rgba(2, 132, 199, 0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, drawR + 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      };
+
+      renderBlueHandle(geom.handles.width, 'width');
+      renderBlueHandle(geom.handles.depth, 'depth');
+      renderBlueHandle(geom.handles.corner, 'corner');
+
+      // --- 角丸(R)調整ハンドルの描画 ---
+      const rh = geom.handles.radius;
+      const isRCurrent = (state.isDragging && state.dragHandle === 'radius');
+      ctx.save();
+
+      // ドラッグ中またはホバー時に角からハンドルへの斜めガイド線を表示
+      ctx.strokeStyle = isRCurrent ? 'rgba(217, 119, 6, 0.8)' : 'rgba(217, 119, 6, 0.35)';
+      ctx.lineWidth = isRCurrent ? 2 : 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(bx + bw, by);
+      ctx.lineTo(rh.x, rh.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // ハンドル本体
+      ctx.shadowColor = isRCurrent ? 'rgba(217, 119, 6, 0.7)' : 'rgba(217, 119, 6, 0.4)';
+      ctx.shadowBlur = isRCurrent ? 14 : 7;
+      ctx.fillStyle = isRCurrent ? '#ea580c' : '#f97316';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.5;
+
+      const rDrawR = isRCurrent ? rh.r + 4 : rh.r;
+      ctx.beginPath();
+      ctx.arc(rh.x, rh.y, rDrawR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // 外周の注意喚起パルスリング
+      ctx.strokeStyle = 'rgba(249, 115, 22, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(rh.x, rh.y, rDrawR + 4, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // ハンドル内テキスト
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('R', rh.x, rh.y);
+
+      // ドラッグ中にハンドルのすぐ横へ現在R値を吹き出し表示
+      if (isRCurrent) {
+        const tagText = `${state.radius}R`;
+        ctx.font = 'bold 12px Inter, sans-serif';
+        const tagWidth = ctx.measureText(tagText).width + 14;
+        const tagX = rh.x - tagWidth - 8;
+        const tagY = rh.y - 12;
+
+        ctx.fillStyle = '#1e293b';
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.roundRect(tagX, tagY, tagWidth, 24, 6);
+        ctx.fill();
+
+        ctx.fillStyle = '#f97316';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(tagText, tagX + tagWidth / 2, tagY + 12);
+      }
+
+      ctx.restore();
+    }
+
+    function getPointerPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+    }
+
+    function detectHitHandle(pos) {
+      // スマホでは指の接触面積を考慮して広めのヒット判定
+      const hitBuffer = 20;
+      for (const [key, h] of Object.entries(geom.handles)) {
+        const dx = pos.x - h.x;
+        const dy = pos.y - h.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist <= h.r + hitBuffer) {
+          return key;
+        }
+      }
+      return null;
+    }
+
+    function onPointerDown(e) {
+      const pos = getPointerPos(e);
+      const hit = detectHitHandle(pos);
+
+      if (hit) {
+        state.isDragging = true;
+        state.dragHandle = hit;
+        state.dragStartPos = pos;
+        state.dragStartValue = {
+          width: state.width,
+          depth: state.depth,
+          radius: state.radius
+        };
+        try {
+          canvas.setPointerCapture(e.pointerId);
+        } catch (err) {}
+        draw();
+      }
+    }
+
+    function onPointerMove(e) {
+      const pos = getPointerPos(e);
+
+      if (!state.isDragging) {
+        const hit = detectHitHandle(pos);
+        if (hit && geom.handles[hit]) {
+          canvas.style.cursor = geom.handles[hit].cursor;
+        } else {
+          canvas.style.cursor = 'default';
+        }
+        return;
+      }
+
+      const dx = pos.x - state.dragStartPos.x;
+      const dy = pos.y - state.dragStartPos.y;
+      // 天板が中央配置のため、端を右にdx動かした時にポインタと端の位置が正確に一致するよう2倍で換算
+      const mmDx = Math.round((dx * 2) / geom.scale);
+      const mmDy = Math.round((dy * 2) / geom.scale);
+
+      if (state.dragHandle === 'width') {
+        state.width = Math.max(400, Math.min(2400, Math.round((state.dragStartValue.width + mmDx) / 10) * 10));
+      } else if (state.dragHandle === 'depth') {
+        state.depth = Math.max(300, Math.min(1200, Math.round((state.dragStartValue.depth + mmDy) / 10) * 10));
+      } else if (state.dragHandle === 'corner') {
+        state.width = Math.max(400, Math.min(2400, Math.round((state.dragStartValue.width + mmDx) / 10) * 10));
+        state.depth = Math.max(300, Math.min(1200, Math.round((state.dragStartValue.depth + mmDy) / 10) * 10));
+      } else if (state.dragHandle === 'radius') {
+        // 右上角の頂点から斜め内側（左下方向: dx<0, dy>0）へ引っ張るとRが増加
+        // 45度の対角線ベクトルへ射影して滑らかな操作感を実現
+        const diagonalProjection = (-dx + dy) * 0.7071;
+        const deltaR = Math.round(diagonalProjection / geom.scale);
+        const maxAllowedR = Math.min(120, Math.floor(Math.min(state.width, state.depth) / 2));
+        state.radius = Math.max(0, Math.min(maxAllowedR, Math.round((state.dragStartValue.radius + deltaR) / 5) * 5));
+      }
+
+      syncUI();
+      draw();
+    }
+
+    function onPointerUp(e) {
+      if (state.isDragging) {
+        state.isDragging = false;
+        state.dragHandle = null;
+        try {
+          canvas.releasePointerCapture(e.pointerId);
+        } catch (err) {}
+        canvas.style.cursor = 'default';
+        draw();
+      }
+    }
+
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerUp);
+
+    function bindInputs() {
+      // 幅
+      inputWidth.addEventListener('input', (e) => {
+        state.width = Math.max(400, Math.min(2400, Number(e.target.value) || 400));
+        syncUI();
+        draw();
+      });
+      rangeWidth.addEventListener('input', (e) => {
+        state.width = Number(e.target.value);
+        syncUI();
+        draw();
+      });
+
+      // 奥行き
+      inputDepth.addEventListener('input', (e) => {
+        state.depth = Math.max(300, Math.min(1200, Number(e.target.value) || 300));
+        syncUI();
+        draw();
+      });
+      rangeDepth.addEventListener('input', (e) => {
+        state.depth = Number(e.target.value);
+        syncUI();
+        draw();
+      });
+
+      // 角R
+      inputRadius.addEventListener('input', (e) => {
+        const maxR = Math.min(120, Math.floor(Math.min(state.width, state.depth) / 2));
+        state.radius = Math.max(0, Math.min(maxR, Number(e.target.value) || 0));
+        syncUI();
+        draw();
+      });
+      rangeRadius.addEventListener('input', (e) => {
+        state.radius = Number(e.target.value);
+        syncUI();
+        draw();
+      });
+
+      // クイック微調整ステッパー
+      document.querySelectorAll('.quick-step-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.getAttribute('data-target');
+          const step = Number(btn.getAttribute('data-step'));
+          if (target === 'width') {
+            state.width = Math.max(400, Math.min(2400, state.width + step));
+          } else if (target === 'depth') {
+            state.depth = Math.max(300, Math.min(1200, state.depth + step));
+          } else if (target === 'radius') {
+            const maxR = Math.min(120, Math.floor(Math.min(state.width, state.depth) / 2));
+            state.radius = Math.max(0, Math.min(maxR, state.radius + step));
+          }
+          syncUI();
+          draw();
+        });
+      });
+
+      // 4辺の△ボタン切り替え
+      edgeToggleTop.addEventListener('click', () => {
+        state.edges.top = !state.edges.top;
+        syncUI();
+        draw();
+      });
+      edgeToggleBottom.addEventListener('click', () => {
+        state.edges.bottom = !state.edges.bottom;
+        syncUI();
+        draw();
+      });
+      edgeToggleLeft.addEventListener('click', () => {
+        state.edges.left = !state.edges.left;
+        syncUI();
+        draw();
+      });
+      edgeToggleRight.addEventListener('click', () => {
+        state.edges.right = !state.edges.right;
+        syncUI();
+        draw();
+      });
+
+      // 一括ON/OFF
+      btnAllEdgeOn.addEventListener('click', () => {
+        state.edges.top = true;
+        state.edges.bottom = true;
+        state.edges.left = true;
+        state.edges.right = true;
+        syncUI();
+        draw();
+      });
+      btnAllEdgeOff.addEventListener('click', () => {
+        state.edges.top = false;
+        state.edges.bottom = false;
+        state.edges.left = false;
+        state.edges.right = false;
+        syncUI();
+        draw();
+      });
+
+      // 標準寸法リセット
+      btnResetView.addEventListener('click', () => {
+        state.width = 1400;
+        state.depth = 750;
+        state.radius = 30;
+        state.material = 'oak';
+        state.edges = { top: true, bottom: true, left: true, right: true };
+        document.querySelectorAll('.mat-btn').forEach(b => {
+          b.classList.remove('active', 'border-amber-400', 'bg-amber-50', 'text-amber-900');
+          if (b.getAttribute('data-material') === 'oak') {
+            b.classList.add('active', 'border-amber-400', 'bg-amber-50', 'text-amber-900');
+          }
+        });
+        syncUI();
+        draw();
+        showToast('標準仕様にリセットしました');
+      });
+
+      // 樹種セレクター
+      document.querySelectorAll('.mat-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.mat-btn').forEach(b => {
+            b.classList.remove('active', 'border-amber-400', 'bg-amber-50', 'text-amber-900');
+            b.classList.add('border-slate-200', 'text-slate-700');
+          });
+          btn.classList.add('active', 'border-amber-400', 'bg-amber-50', 'text-amber-900');
+          btn.classList.remove('border-slate-200', 'text-slate-700');
+          state.material = btn.getAttribute('data-material');
+          syncUI();
+          draw();
+        });
+      });
+
+      // モバイル下部バーから注文エリアへのスクロール
+      if (btnMobileScrollToOrder) {
+        btnMobileScrollToOrder.addEventListener('click', () => {
+          document.getElementById('orderCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
+
+      // メール発注処理
+      btnSendOrder.addEventListener('click', sendOrderMail);
+      btnCopyOrderText.addEventListener('click', copyOrderText);
+    }
+
+    function buildOrderMailText() {
+      const name = orderCustomerName.value.trim() || '（未記入）';
+      const phone = orderCustomerPhone.value.trim() || '（未記入）';
+      const notes = orderNotes.value.trim() || '（特になし）';
+      const price = calculatePrice().toLocaleString('ja-JP');
+
+      const activeEdges = [];
+      if (state.edges.top) activeEdges.push('上辺 (奥側)');
+      if (state.edges.bottom) activeEdges.push('下辺 (手前側)');
+      if (state.edges.left) activeEdges.push('左辺');
+      if (state.edges.right) activeEdges.push('右辺');
+      const edgeStr = activeEdges.length === 4 ? '全4辺施工あり' : (activeEdges.length === 0 ? '施工なし' : activeEdges.join(', '));
+
+      return `【天板・建築資材 発注オーダー】
+
+■ お客様情報
+・お名前 / 貴社名: ${name}
+・ご連絡先電話番号: ${phone}
+
+■ 仕様詳細
+・樹種: ${materials[state.material].name}
+・横幅 (W): ${state.width} mm
+・奥行き (D): ${state.depth} mm
+・板厚 (T): ${state.thickness} mm
+・4隅の角丸加工 (R値): ${state.radius} R (${state.radius > 0 ? '丸めあり' : '直角'})
+・木口補強テープ (シール施工): ${edgeStr}
+
+■ 概算参考価格 (税別)
+・概算金額: ¥${price}
+
+■ ご要望・備考
+${notes}
+
+----------------------------------------
+※シミュレーター画面より送信`;
+    }
+
+    function sendOrderMail() {
+      const name = orderCustomerName.value.trim();
+      if (!name) {
+        showToast('お名前または貴社名をご入力ください', true);
+        orderCustomerName.focus();
+        return;
+      }
+
+      const recipient = 'nijiua@gmail.com';
+      const subject = `【天板発注】${name}様 (${state.width}x${state.depth}mm / ${materials[state.material].name.split(' ')[0]})`;
+      const body = buildOrderMailText();
+      const mailtoUrl = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+      window.location.href = mailtoUrl;
+      showToast('メーラーを起動しました');
+    }
+
+    function copyOrderText() {
+      const text = buildOrderMailText();
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        showToast('発注内容テキストをコピーしました');
+      } catch (err) {
+        showToast('コピーに失敗しました', true);
+      }
+      document.body.removeChild(textArea);
+    }
+
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toastNotification');
+      const msg = document.getElementById('toastMessage');
+      const icon = document.getElementById('toastIcon');
+
+      msg.textContent = message;
+      if (isError) {
+        icon.className = 'text-rose-400';
+        icon.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+      } else {
+        icon.className = 'text-emerald-400';
+        icon.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`;
+      }
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    window.addEventListener('resize', () => {
+      draw();
+    });
+
+    window.addEventListener('load', () => {
+      bindInputs();
+      syncUI();
+      // レンダリング遅延に対応して初回確実に描画
+      setTimeout(() => {
+        draw();
+      }, 50);
+    });
+  </script>
+</body>
+</html>
